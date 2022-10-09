@@ -2,25 +2,25 @@
 This file holds the object that handles the 
 DS Ensembling
 """
-from pydantic.typing import List, Union
+from pydantic.typing import List, Union, Tuple
 from numpy import ndarray
 import numpy as np
 from pandas import get_dummies
 
-def DSEnsemble():
+class DSEnsemble():
     
     """
     This class will enable DS ensembling of models based 
     on user provided models and evaluation pipelines
     """
     def __init__(self, models: List, model_types:Union[List[str], str],
-                holdout_set: tuple(ndarray, ndarray), output_class_count: int,
+                evaluation_set: Tuple[ndarray, ndarray], output_class_count: int,
                 preprocess_functions=None):
         
         # set the class attributes
         self.models = models
         self.model_types = model_types
-        self.holdout_set = holdout_set
+        self.evaluation_set = evaluation_set
         if preprocess_functions:
             self.preprocess_functions = preprocess_functions
         else:
@@ -28,15 +28,40 @@ def DSEnsemble():
         self.num_output_classes = output_class_count
 
         # create an empty attribute to hold belief results
-        self.model_beliefs: List[ndarray] = self.__setup_bel_eval__()
+        self.model_beliefs = list()
+        self.__setup_bel_eval__()
 
     def __setup_bel_eval__(self):
         """
         This method generates beliefs for each class based on the
-        passed in eval set
+        passed in eval set, as sklearn models don't give 
+        'belief' predictions, rather justa single class
         """
-        for model in self.models:
-            self.model_beliefs.append(np.ones([len(np.unique(self.num_output_classes))], dtype=np.float))
+        for model, model_type in zip(self.models, self.model_types):
+            if model_type == 'sklearn':
+                # get the predictions on the eval set
+                preds = model.predict(self.evaluation_set[0])
+                # group by the predicted classes and get belief for each
+                # class based on pred
+                counts = np.zeros([self.num_output_classes, self.num_output_classes], dtype=np.float)
+                for pred, truth in zip(preds, self.evaluation_set[1]):
+                    counts[pred, truth] += 1
+
+
+                # ensure small delta to never have 0 or 1 beliefs
+                counts = np.where(counts==0, 0.1, counts)
+
+                # normalize and add to beliefs
+                normed = counts/counts.sum(axis=-1, keepdims=True)
+
+                self.model_beliefs.append(normed)
+
+            else:
+                self.model_beliefs.append(np.zeros([self.num_output_classes, self.num_output_classes], dtype=np.float))
+        
+        # convert to nparray
+        self.model_beliefs = np.array(self.model_beliefs)
+
 
     def predict(self, pred_data: ndarray, decision_metric:str='bel'):
         """
@@ -45,7 +70,7 @@ def DSEnsemble():
         """
         # preallocate array to hold belief outputs in array
         # of shape: n_samples x n_classes x n_models
-        cumulative_beliefs = np.zeros([pred_data.shape[0], self.num_output_classes, len(self.models)])
+        cumulative_beliefs = np.ones([pred_data.shape[0], self.num_output_classes, len(self.models)])
 
         # for each model, predict on the results
         for i in range(len(self.models)):
@@ -53,7 +78,7 @@ def DSEnsemble():
             # get the relevant details for this iteration
             model = self.models[i]
             norm_func = self.preprocess_functions[i]
-            beliefs = self.model_beliefs[i]
+            beliefs = self.model_beliefs[i,:,:]
 
             # apply the normalization if relevant
             if norm_func:
@@ -62,11 +87,8 @@ def DSEnsemble():
             # predict on the data
             preds = model.predict(pred_data)
 
-            # convert it to beliefs
-            # first need one hot preds for calculations
-            preds_oh = pd.get_dummies(preds)
-            # matrix multiply for beliefs
-            cur_bels = np.matmul(preds_oh, beliefs)
+            # matrix lookup for beliefs corresponding to pred
+            cur_bels = np.array([beliefs[class_pred,:] for class_pred in preds])
 
             # save off in our final array
             cumulative_beliefs[:,:,i] = cur_bels
@@ -84,14 +106,28 @@ def DSEnsemble():
         return preds
 
     def __dempster_combination__(self, cumulative_beliefs: ndarray):
-        #TODO: Actually make this work correctly
-        # for now we just average
+        """
+        do dempster combination on the resulting belief matrix from previous predictions,
+        input is n_samples x n_classes x n_models and each entry is the corresponding belief
+        """
+
+        # currently we can just dot across the last dimension and normalize,
+        # since all is single dimensional then plaus = bel
+        prod = np.ones([cumulative_beliefs.shape[0], cumulative_beliefs.shape[1]])
+        for i in range(cumulative_beliefs.shape[-1]):
+            prod = np.multiply(prod, np.squeeze(cumulative_beliefs[:,:,i]))
+
+            # normalize to minimize underflow errors
+            prod = prod/prod.sum(axis=-1, keepdims=True)
+
+        # setup our return
         combined_results = np.zeros([cumulative_beliefs.shape[0], cumulative_beliefs.shape[1], 2],
                                     dtype=np.float)
 
-        summed = np.sum(combined_results, axis=-1)
-        combined_results[:,:,0] = summed/np.sum(summed, axis=-1)
-        combined_results[:,:,1] = 1 - combined_results[:,:,0]
+        combined_results[:,:,0] = prod
+        combined_results[:,:,1] = prod
+
+        #TODO: expand this to work across multiple class overlaps eventually
 
         return combined_results
 
