@@ -6,6 +6,9 @@ from pydantic.typing import List, Union, Tuple
 from numpy import ndarray
 import numpy as np
 from pandas import get_dummies
+import pyds
+
+from ds_ensemble.Model import Model
 
 class DSEnsemble():
     
@@ -13,19 +16,11 @@ class DSEnsemble():
     This class will enable DS ensembling of models based 
     on user provided models and evaluation pipelines
     """
-    def __init__(self, models: List, model_types:Union[List[str], str],
-                evaluation_set: Tuple[ndarray, ndarray], output_class_count: int,
-                preprocess_functions=None):
+    def __init__(self, models: List[Model], evaluation_set: ndarray):
         
         # set the class attributes
         self.models = models
-        self.model_types = model_types
         self.evaluation_set = evaluation_set
-        if preprocess_functions:
-            self.preprocess_functions = preprocess_functions
-        else:
-            self.preprocess_functions = [None for model in models]
-        self.num_output_classes = output_class_count
 
         # create an empty attribute to hold belief results
         self.model_beliefs = list()
@@ -37,13 +32,14 @@ class DSEnsemble():
         passed in eval set, as sklearn models don't give 
         'belief' predictions, rather justa single class
         """
-        for model, model_type in zip(self.models, self.model_types):
-            if model_type == 'sklearn':
+        for model in self.models:
+            if model.type == 'sklearn':
                 # get the predictions on the eval set
                 preds = model.predict(self.evaluation_set[0])
+
                 # group by the predicted classes and get belief for each
                 # class based on pred
-                counts = np.zeros([self.num_output_classes, self.num_output_classes], dtype=np.float)
+                counts = np.zeros([len(model.outputs), len(model.outputs)], dtype=np.float)
                 for pred, truth in zip(preds, self.evaluation_set[1]):
                     counts[pred, truth] += 1
 
@@ -68,21 +64,14 @@ class DSEnsemble():
         Predict on the evaluation set for each model and 
         return the ensemble results
         """
-        # preallocate array to hold belief outputs in array
-        # of shape: n_samples x n_classes x n_models
-        cumulative_beliefs = np.ones([pred_data.shape[0], self.num_output_classes, len(self.models)])
-
+        cumulative_beliefs = list()
+        
         # for each model, predict on the results
         for i in range(len(self.models)):
 
             # get the relevant details for this iteration
             model = self.models[i]
-            norm_func = self.preprocess_functions[i]
             beliefs = self.model_beliefs[i,:,:]
-
-            # apply the normalization if relevant
-            if norm_func:
-                pred_data = norm_func(pred_data)
 
             # predict on the data
             preds = model.predict(pred_data)
@@ -91,12 +80,12 @@ class DSEnsemble():
             cur_bels = np.array([beliefs[class_pred,:] for class_pred in preds])
 
             # save off in our final array
-            cumulative_beliefs[:,:,i] = cur_bels
+            cumulative_beliefs.append(cur_bels)
 
         # now that we have all belies across the models, we can do ds ensembling
         # returned array will be n_samples x n_classes x 2 where the last dimension has
         # belief in the 0th index and plausibility in the 1th index
-        ensembled_results = self.__dempster_combination__(cumulative_beliefs)
+        ensembled_results = self.__dempster_combination__(np.array(cumulative_beliefs))
 
         # now we predict based on the selected method
         if decision_metric == 'bel':
@@ -108,8 +97,20 @@ class DSEnsemble():
     def __dempster_combination__(self, cumulative_beliefs: ndarray):
         """
         do dempster combination on the resulting belief matrix from previous predictions,
-        input is n_samples x n_classes x n_models and each entry is the corresponding belief
+        input is n_models x n_samples x n_outputs and each entry is the corresponding belief
         """
+
+        # loop over all samples
+        for i in range(cumulative_beliefs.shape[1]):
+            # samples will then be that index
+            belief_entries = np.squeeze(cumulative_beliefs[:,i,:])
+            # belief entries is now a n_models x n_output_classes
+            # entry for the current sample
+
+            # now we ensemble based on the classes for each model
+            for j in range(len(self.models)):
+
+                # construct the 
 
         # currently we can just dot across the last dimension and normalize,
         # since all is single dimensional then plaus = bel
