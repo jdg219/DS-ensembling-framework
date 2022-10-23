@@ -64,13 +64,13 @@ if __name__=='__main__':
     # place them in the model wrapper
     svm_wrap = Model(trained_model = clf_svm,
                      model_type = 'sklearn',
-                     output_classes = ['1', '2', '3'],
+                     output_classes = ['0', '1', '2'],
                      preprocess_function = None
                     )
     
     knn_wrap = Model(trained_model = clf_knn,
                      model_type = 'sklearn',
-                     output_classes = ['1', '2', '3'],
+                     output_classes = ['0', '1', '2'],
                      preprocess_function = normalize_iris_data
                     )
 

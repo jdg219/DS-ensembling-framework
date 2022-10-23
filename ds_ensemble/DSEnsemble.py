@@ -33,28 +33,28 @@ class DSEnsemble():
         'belief' predictions, rather justa single class
         """
         for model in self.models:
-            if model.type == 'sklearn':
-                # get the predictions on the eval set
-                preds = model.predict(self.evaluation_set[0])
+            # get the predictions on the eval set
+            preds = model.predict(self.evaluation_set[0])
 
-                # group by the predicted classes and get belief for each
-                # class based on pred
-                counts = np.zeros([len(model.outputs), len(model.outputs)], dtype=np.float)
-                for pred, truth in zip(preds, self.evaluation_set[1]):
-                    counts[pred, truth] += 1
+            # group by the predicted classes and get belief for each
+            # class based on pred
+            counts = np.zeros([len(model.outputs), len(model.outputs)], dtype=np.float)
+            for pred, truth in zip(preds, self.evaluation_set[1]):
+                counts[pred, truth] += 1
 
 
-                # ensure small delta to never have 0 or 1 beliefs
-                counts = np.where(counts==0, 0.1, counts)
+            # ensure small delta to never have 0 or 1 beliefs
+            counts = np.where(counts==0, 0.1, counts)
 
-                # normalize and add to beliefs
-                normed = counts/counts.sum(axis=-1, keepdims=True)
+            # normalize and set to be beliefs
+            # accounting for model accuracy of each class
+            # and beliefs of classes given pred
+            normed_1 = counts/counts.sum(axis=-1, keepdims=True)
+            normed_2 = counts/counts.sum(axis=0, keepdims=True)
+            normed = np.multiply(normed_1, normed_2)
 
-                self.model_beliefs.append(normed)
+            self.model_beliefs.append(normed)
 
-            else:
-                self.model_beliefs.append(np.zeros([self.num_output_classes, self.num_output_classes], dtype=np.float))
-        
         # convert to nparray
         self.model_beliefs = np.array(self.model_beliefs)
 
@@ -83,16 +83,19 @@ class DSEnsemble():
             cumulative_beliefs.append(cur_bels)
 
         # now that we have all belies across the models, we can do ds ensembling
-        # returned array will be n_samples x n_classes x 2 where the last dimension has
-        # belief in the 0th index and plausibility in the 1th index
+        # returned array will be ensembled results for each sample
         ensembled_results = self.__dempster_combination__(np.array(cumulative_beliefs))
 
         # now we predict based on the selected method
-        if decision_metric == 'bel':
-            decision_data = np.squeeze(ensembled_results[:,:,0])
-            preds = np.argmax(decision_data, axis=-1)
+        output = np.zeros(pred_data.shape[0], dtype=int)
+        if decision_metric.lower() == 'bel':
+            
+            # get the max belief set of each sample
+            for i in range(len(ensembled_results)):
+                res, = ensembled_results[i].max_bel()
+                output[i] = int(res)
 
-        return preds
+        return output
 
     def __dempster_combination__(self, cumulative_beliefs: ndarray):
         """
@@ -101,6 +104,8 @@ class DSEnsemble():
         """
 
         # loop over all samples
+        # and create a DS combination result for each
+        results = []
         for i in range(cumulative_beliefs.shape[1]):
             # samples will then be that index
             belief_entries = np.squeeze(cumulative_beliefs[:,i,:])
@@ -108,27 +113,21 @@ class DSEnsemble():
             # entry for the current sample
 
             # now we ensemble based on the classes for each model
+            bpas = []
             for j in range(len(self.models)):
 
-                # construct the 
+                # construct the bpas
+                bpa = pyds.MassFunction({output_class : belief 
+                        for output_class, belief in  zip(self.models[j].outputs, belief_entries[j])})
 
-        # currently we can just dot across the last dimension and normalize,
-        # since all is single dimensional then plaus = bel
-        prod = np.ones([cumulative_beliefs.shape[0], cumulative_beliefs.shape[1]])
-        for i in range(cumulative_beliefs.shape[-1]):
-            prod = np.multiply(prod, np.squeeze(cumulative_beliefs[:,:,i]))
+                # add to bpa list
+                bpas.append(bpa)
 
-            # normalize to minimize underflow errors
-            prod = prod/prod.sum(axis=-1, keepdims=True)
+            # now we perform the DS combination
+            result_entry = bpas[0].combine_conjunctive(*bpas[1:])
 
-        # setup our return
-        combined_results = np.zeros([cumulative_beliefs.shape[0], cumulative_beliefs.shape[1], 2],
-                                    dtype=np.float)
-
-        combined_results[:,:,0] = prod
-        combined_results[:,:,1] = prod
-
-        #TODO: expand this to work across multiple class overlaps eventually
-
-        return combined_results
+            # add it to cumulative list
+            results.append(result_entry)
+        
+        return results
 
