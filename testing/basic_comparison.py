@@ -15,6 +15,7 @@ import numpy as np
 from scipy.stats import mode
 
 from ds_ensemble.DSEnsemble import DSEnsemble as DSE
+from ds_ensemble.Model import Model
 
 # create some normalization functions to help
 # demo data transforms for ensembling
@@ -59,13 +60,32 @@ if __name__=='__main__':
     clf_knn.fit(x_train_norm, y_train)
     clf_lr.fit(x_train_norm, y_train)
 
+    # place them in the model wrapper
+    svm_wrap = Model(trained_model = clf_svm,
+                     model_type = 'sklearn',
+                     output_classes = ['0', '1', '2'],
+                     preprocess_function = None
+                    )
+    
+    knn_wrap = Model(trained_model = clf_knn,
+                     model_type = 'sklearn',
+                     output_classes = ['0', '1', '2'],
+                     preprocess_function = normalize_iris_data
+                    )
+
+    lr_wrap = Model(trained_model = clf_lr,
+                     model_type = 'sklearn',
+                     output_classes = ['0', '1', '2'],
+                     preprocess_function = normalize_iris_data
+                    )
+
+    # now setup the beliefs for each model based on our eval set
+    svm_wrap.setup_beliefs([x_eval, y_eval])
+    knn_wrap.setup_beliefs([x_eval, y_eval])
+    lr_wrap.setup_beliefs([x_eval, y_eval])
+
     # now we instantiate our ds ensembling
-    dse = DSE(  models=[clf_svm, clf_knn, clf_lr],
-                model_types=['sklearn', 'sklearn', 'sklearn'],
-                evaluation_set=(x_eval, y_eval),
-                output_class_count = 3,
-                preprocess_functions=[None, normalize_iris_data, normalize_iris_data]
-            )
+    dse = DSE(models=[svm_wrap, knn_wrap])
 
     # finally we can predict on our test set using belief as
     # the predictor method

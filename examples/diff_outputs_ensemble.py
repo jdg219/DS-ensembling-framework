@@ -1,8 +1,6 @@
 """
-This file demos a simple ensembling of sklearn
-models on the iris dataset. This is meant to 
-function more as a demo/plumbing check than a 
-state of the art result
+This file will DS ensemble two unique model
+outputs
 """
 
 from sklearn.svm import SVC as svm
@@ -52,31 +50,38 @@ if __name__=='__main__':
     clf_svm = svm()
     clf_knn = KNeighborsClassifier(n_neighbors=3)
 
+    # now we artificially combine classes 0 and 1 to be 0 for the svm
+    # and 1 and 2 to be 1 for the KNN
+    y_train_svm = np.where(y_train==2, 1, 0)
+    y_eval_svm = np.where(y_eval==2, 1, 0)
+    y_train_knn = np.where(y_train==0, 0, 1)
+    y_eval_knn = np.where(y_eval==0, 0, 1)
+
     # just for demo purposes we will only normalize the knn model data
     # to highlight that we could have different normalization approaches 
     # on a per model basis
     x_train_norm = normalize_iris_data(x_train)
 
     # fit our models now
-    clf_svm.fit(x_train, y_train)
-    clf_knn.fit(x_train_norm, y_train)
+    clf_svm.fit(x_train, y_train_svm)
+    clf_knn.fit(x_train_norm, y_train_knn)
 
     # place them in the model wrapper
     svm_wrap = Model(trained_model = clf_svm,
                      model_type = 'sklearn',
-                     output_classes = ['0', '1', '2'],
+                     output_classes = ['01', '2'],
                      preprocess_function = None
                     )
     
     knn_wrap = Model(trained_model = clf_knn,
                      model_type = 'sklearn',
-                     output_classes = ['0', '1', '2'],
+                     output_classes = ['0', '12'],
                      preprocess_function = normalize_iris_data
                     )
 
     # now setup the beliefs for each model based on our eval set
-    svm_wrap.setup_beliefs([x_eval, y_eval])
-    knn_wrap.setup_beliefs([x_eval, y_eval])
+    svm_wrap.setup_beliefs([x_eval, y_eval_svm])
+    knn_wrap.setup_beliefs([x_eval, y_eval_knn])
 
     # now we instantiate our ds ensembling
     dse = DSE(models=[svm_wrap, knn_wrap])

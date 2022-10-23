@@ -16,48 +16,13 @@ class DSEnsemble():
     This class will enable DS ensembling of models based 
     on user provided models and evaluation pipelines
     """
-    def __init__(self, models: List[Model], evaluation_set: ndarray):
+    def __init__(self, models: List[Model]):
         
         # set the class attributes
         self.models = models
-        self.evaluation_set = evaluation_set
 
         # create an empty attribute to hold belief results
-        self.model_beliefs = list()
-        self.__setup_bel_eval__()
-
-    def __setup_bel_eval__(self):
-        """
-        This method generates beliefs for each class based on the
-        passed in eval set, as sklearn models don't give 
-        'belief' predictions, rather justa single class
-        """
-        for model in self.models:
-            # get the predictions on the eval set
-            preds = model.predict(self.evaluation_set[0])
-
-            # group by the predicted classes and get belief for each
-            # class based on pred
-            counts = np.zeros([len(model.outputs), len(model.outputs)], dtype=np.float)
-            for pred, truth in zip(preds, self.evaluation_set[1]):
-                counts[pred, truth] += 1
-
-
-            # ensure small delta to never have 0 or 1 beliefs
-            counts = np.where(counts==0, 0.1, counts)
-
-            # normalize and set to be beliefs
-            # accounting for model accuracy of each class
-            # and beliefs of classes given pred
-            normed_1 = counts/counts.sum(axis=-1, keepdims=True)
-            normed_2 = counts/counts.sum(axis=0, keepdims=True)
-            normed = np.multiply(normed_1, normed_2)
-
-            self.model_beliefs.append(normed)
-
-        # convert to nparray
-        self.model_beliefs = np.array(self.model_beliefs)
-
+        self.model_beliefs = np.array([model.belief for model in models])
 
     def predict(self, pred_data: ndarray, decision_metric:str='bel'):
         """

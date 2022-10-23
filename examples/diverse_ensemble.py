@@ -6,5 +6,6 @@ of the output space covered by models
 Ex:
 NN - predicts all output classes
 &
-KNN - predicts classes 1&2 vs 3&4
+KNN - predicts classes 1 vs 2&3
 """
+
