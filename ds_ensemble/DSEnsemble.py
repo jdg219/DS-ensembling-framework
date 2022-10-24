@@ -22,21 +22,21 @@ class DSEnsemble():
         self.models = models
 
         # create an empty attribute to hold belief results
-        self.model_beliefs = np.array([model.belief for model in models])
+        self.model_beliefs = [model.belief for model in models]
 
     def predict(self, pred_data: ndarray, decision_metric:str='bel'):
         """
         Predict on the evaluation set for each model and 
         return the ensemble results
         """
-        cumulative_beliefs = list()
+        cumulative_beliefs = np.empty(len(self.models), dtype=object)
         
         # for each model, predict on the results
         for i in range(len(self.models)):
 
             # get the relevant details for this iteration
             model = self.models[i]
-            beliefs = self.model_beliefs[i,:,:]
+            beliefs = self.model_beliefs[i]
 
             # predict on the data
             preds = model.predict(pred_data)
@@ -45,11 +45,12 @@ class DSEnsemble():
             cur_bels = np.array([beliefs[class_pred,:] for class_pred in preds])
 
             # save off in our final array
-            cumulative_beliefs.append(cur_bels)
+            cumulative_beliefs[i] = cur_bels
 
         # now that we have all belies across the models, we can do ds ensembling
         # returned array will be ensembled results for each sample
-        ensembled_results = self.__dempster_combination__(np.array(cumulative_beliefs))
+        print(cumulative_beliefs.shape)
+        ensembled_results = self.__dempster_combination__(cumulative_beliefs)
 
         # now we predict based on the selected method
         output = np.zeros(pred_data.shape[0], dtype=int)
@@ -71,19 +72,18 @@ class DSEnsemble():
         # loop over all samples
         # and create a DS combination result for each
         results = []
-        for i in range(cumulative_beliefs.shape[1]):
-            # samples will then be that index
-            belief_entries = np.squeeze(cumulative_beliefs[:,i,:])
-            # belief entries is now a n_models x n_output_classes
-            # entry for the current sample
+        for i in range(cumulative_beliefs[0].shape[0]):
 
             # now we ensemble based on the classes for each model
             bpas = []
             for j in range(len(self.models)):
 
+                # extract the desired entries
+                belief_entries = cumulative_beliefs[j][i,:]
+
                 # construct the bpas
                 bpa = pyds.MassFunction({output_class : belief 
-                        for output_class, belief in  zip(self.models[j].outputs, belief_entries[j])})
+                        for output_class, belief in  zip(self.models[j].outputs, belief_entries)})
 
                 # add to bpa list
                 bpas.append(bpa)

@@ -21,6 +21,7 @@ Pillow==9.2.0
 prompt-toolkit==3.0.31
 ptyprocess==0.7.0
 pure-eval==0.2.2
+-e git+https://github.com/reineking/pyds.git@30d669c5826366031ae820623e18f0546a3fa3d6#egg=py_dempster_shafer
 pydantic==1.10.2
 Pygments==2.13.0
 pyparsing==3.0.9
@@ -36,3 +37,4 @@ threadpoolctl==3.1.0
 traitlets==5.4.0
 typing-extensions==4.4.0
 wcwidth==0.2.5
+xgboost==1.6.2

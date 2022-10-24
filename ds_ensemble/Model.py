@@ -32,7 +32,7 @@ class Model:
 
         # predict based on model type
         preds = None
-        if self.type == 'sklearn':
+        if self.type == 'sklearn' or self.type == 'xgboost':
             preds = self.model.predict(pred_data)
 
         return preds
