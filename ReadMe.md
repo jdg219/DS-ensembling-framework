@@ -41,7 +41,7 @@ ensembing.
 
 ## Limitations
 
-The library is able to combine xgboost and sklearn models successfully.
+The library is able to combine xgboost, tensorflow, and sklearn models successfully.
 
 
 ## Roadmap
@@ -58,11 +58,10 @@ A brief description of accomplished tasks and those yet to be completed.
 - More diverse model ensembling example
 - Expand combination class to handle different levels of prediction {a vs b vs c} or {a&b vs c}
 - Include XGBoost model capability
-
+- Expand combination class to handle tensorflow models
 
 #### Work in Progress
 
-- Expand combination class to handle tensorflow/pytorch models
 - Create tests for traditional vs DS ensemble
     * Diverse model architectures
     * Crossval fold trained models

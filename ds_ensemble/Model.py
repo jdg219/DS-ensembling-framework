@@ -35,6 +35,11 @@ class Model:
         if self.type == 'sklearn' or self.type == 'xgboost':
             preds = self.model.predict(pred_data)
 
+        elif self.type == 'tensorflow':
+            preds = np.argmax(self.model.predict(pred_data), axis=-1)
+        else:
+            raise Exception("MODEL TYPE NOT SUPPORTED: only 'sklearn' 'xgboost' and 'tensorflow' are currently implemented")
+
         return preds
 
     def setup_beliefs(self, evaluation_set: ndarray):

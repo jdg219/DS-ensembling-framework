@@ -9,7 +9,7 @@ NN - predicts all output classes
 KNN - predicts classes 1 vs 2&3
 """
 
-# import tensorflow as tf
+import tensorflow as tf
 import xgboost as xgb
 
 from ds_ensemble.DSEnsemble import DSEnsemble
@@ -21,6 +21,7 @@ from sklearn.metrics import confusion_matrix
 
 from numpy import ndarray
 import numpy as np
+import pandas as pd
 
 # create some normalization functions to help
 # demo data transforms for ensembling
@@ -60,13 +61,23 @@ if __name__=='__main__':
     y_train_knn = np.where(y_train==0, 0, 1)
     y_eval_knn = np.where(y_eval==0, 0, 1)
 
-    # create our two classifiers
+    # make one hot for nn
+    y_train_nn = pd.get_dummies(y_train).values
+
+    # create our classifiers
     clf_knn = KNeighborsClassifier(n_neighbors=3)
     clf_xg = xgb.XGBClassifier(n_estimators=25)
+    clf_nn = tf.keras.models.Sequential([
+                        tf.keras.layers.Dense(10, activation='relu'),
+			tf.keras.layers.Dense(5, activation='relu'),
+			tf.keras.layers.Dense(3, activation='softmax')
+		])
+    clf_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
     # train/fit each
     clf_knn.fit(x_train_norm, y_train_knn)
     clf_xg.fit(x_train_norm, y_train)
+    clf_nn.fit(x_train_norm, y_train_nn, batch_size=25, epochs=100)
 
     # wrap in models
     knn_wrap = Model(trained_model = clf_knn,
@@ -81,12 +92,19 @@ if __name__=='__main__':
                      preprocess_function = normalize_iris_data
                     )
 
+    nn_wrap = Model(trained_model = clf_nn,
+                     model_type = 'tensorflow',
+                     output_classes = ['0', '1', '2'],
+                     preprocess_function = normalize_iris_data
+                    )
+
     # setup the beliefs for each
     knn_wrap.setup_beliefs([x_eval, y_eval_knn])
     xg_wrap.setup_beliefs([x_eval, y_eval])
+    nn_wrap.setup_beliefs([x_eval, y_eval])
 
     # now we instantiate our ds ensembling
-    dse = DSEnsemble(models=[xg_wrap, knn_wrap])
+    dse = DSEnsemble(models=[xg_wrap, knn_wrap, nn_wrap])
 
     # finally we can predict on our test set using belief as
     # the predictor method
