@@ -49,7 +49,6 @@ class DSEnsemble():
 
         # now that we have all belies across the models, we can do ds ensembling
         # returned array will be ensembled results for each sample
-        print(cumulative_beliefs.shape)
         ensembled_results = self.__dempster_combination__(cumulative_beliefs)
 
         # now we predict based on the selected method
@@ -89,7 +88,7 @@ class DSEnsemble():
                 bpas.append(bpa)
 
             # now we perform the DS combination
-            result_entry = bpas[0].combine_conjunctive(*bpas[1:])
+            result_entry = bpas[0].combine_conjunctive(bpas[1:])
 
             # add it to cumulative list
             results.append(result_entry)

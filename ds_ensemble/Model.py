@@ -42,7 +42,7 @@ class Model:
 
         return preds
 
-    def setup_beliefs(self, evaluation_set: ndarray):
+    def setup_beliefs(self, evaluation_set):
         '''
         Setup the model's belief values based on the evaluation set
         '''
@@ -54,7 +54,7 @@ class Model:
         # class based on pred
         counts = np.zeros([len(self.outputs), len(self.outputs)], dtype=np.float)
         for pred, truth in zip(preds, evaluation_set[1]):
-            counts[pred, truth] += 1
+            counts[int(pred), int(truth)] += 1
 
 
         # ensure small delta to never have 0 or 1 beliefs
