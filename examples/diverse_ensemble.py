@@ -106,9 +106,9 @@ if __name__=='__main__':
     # now we instantiate our ds ensembling
     dse = DSEnsemble(models=[xg_wrap, knn_wrap, nn_wrap])
 
-    # finally we can predict on our test set using belief as
+    # finally we can predict on our test set using avg of bel and pr as
     # the predictor method
-    results = dse.predict(x_test, decision_metric='bel')
+    results = dse.predict(x_test, decision_metric='avg_bel_prec')
     for pred, true in zip(results, y_test):
         print("Pred: ", pred, ", True: ", true)
 

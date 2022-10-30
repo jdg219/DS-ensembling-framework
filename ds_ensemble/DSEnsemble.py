@@ -49,6 +49,7 @@ class DSEnsemble():
 
         # now that we have all belies across the models, we can do ds ensembling
         # returned array will be ensembled results for each sample
+        cumulative_beliefs.tofile("tmp.csv", sep=",")
         ensembled_results = self.__dempster_combination__(cumulative_beliefs)
 
         # now we predict based on the selected method
@@ -57,6 +58,32 @@ class DSEnsemble():
             
             # get the max belief set of each sample
             for i in range(len(ensembled_results)):
+                res, = ensembled_results[i].max_bel()
+                output[i] = int(res)
+
+        elif decision_metric.lower() == 'prec':
+            
+            # get the max belief set of each sample
+            for i in range(len(ensembled_results)):
+                res, = ensembled_results[i].max_pl()
+                output[i] = int(res)
+
+        elif decision_metric.lower() == 'avg_bel_prec':
+            
+            # get the max belief set of each sample
+            for i in range(len(ensembled_results)):
+                # setup for the averaging
+                ens_res = ensembled_results[i]
+                max_val = 0
+                res = None
+
+                # average for each
+                for key in ens_res.focal():
+                    val  = (ens_res.bel()[key] + ens_res.pl()[key]) / 2.0
+                    if val > max_val:
+                        max_val = val
+                        res = key
+
                 res, = ensembled_results[i].max_bel()
                 output[i] = int(res)
 
