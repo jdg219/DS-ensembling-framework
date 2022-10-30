@@ -36,7 +36,14 @@ class Model:
             preds = self.model.predict(pred_data)
 
         elif self.type == 'tensorflow':
-            preds = np.argmax(self.model.predict(pred_data), axis=-1)
+            # get the predictions
+            preds = self.model.predict(pred_data)
+
+            # catch special case of binary class
+            if preds.shape[1] == 1:
+                preds = np.where(preds >= .5, 1, 0)
+            else:
+                preds = np.argmax(self.model.predict(pred_data), axis=-1)
         else:
             raise Exception("MODEL TYPE NOT SUPPORTED: only 'sklearn' 'xgboost' and 'tensorflow' are currently implemented")
 

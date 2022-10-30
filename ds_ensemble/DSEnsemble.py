@@ -78,7 +78,7 @@ class DSEnsemble():
             for j in range(len(self.models)):
 
                 # extract the desired entries
-                belief_entries = cumulative_beliefs[j][i,:]
+                belief_entries = np.squeeze(cumulative_beliefs[j][i,:])
 
                 # construct the bpas
                 bpa = pyds.MassFunction({output_class : belief 
